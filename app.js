@@ -134,6 +134,20 @@ app.put("/applications/:id", requireAuth, (req, res) => {
   res.json(application);
 });
 
+app.delete("/applications/:id", requireAuth, (req, res) => {
+  const id = Number(req.params.id);
+  const index = applications.findIndex(
+    (a) => a.id === id && a.userId === req.user.id,
+  );
+
+  if (index === -1) {
+    return res.status(404).json({ error: "Application not found" });
+  }
+
+  applications.splice(index, 1);
+  res.status(204).end();
+});
+
 app.get('/admin/users', requireAuth, requireRole('admin'), (req, res) => {
   res.json(users.map(u => ({ id: u.id, email: u.email, role: u.role })));
 });
