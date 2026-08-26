@@ -5,15 +5,6 @@ import { pool } from "./db.js";
 
 const JWT_SECRET = 'dev-secret-change-me'; // this needs to be stored in an env variable
 
-const users = [];
-const applications = [];
-
-// NEW: running counters, independent of array length.
-// These only ever go up — never recalculated from how many
-// records currently exist, so they survive deletions and can't collide.
-let nextUserId = 1;
-let nextApplicationId = 1;
-
 const app = express();
 
 function requireAuth(req, res, next) {
@@ -50,17 +41,19 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
-app.post("/applications", requireAuth, (req, res) => {
+app.post("/applications", requireAuth, async (req, res) => {
   const { name, description } = req.body;
 
   if (!name || !description) {
     return res.status(400).json({ error: "Name and description required" });
   }
 
-  const userId = req.user.id;
-  const application = { id: nextApplicationId++, name, description, userId };
-  applications.push(application);
-  res.status(201).json(application);
+  const result = await pool.query(
+    "INSERT INTO applications (name, description, user_id) VALUES ($1, $2, $3) RETURNING *",
+    [name, description, req.user.id],
+  );
+
+  res.status(201).json(result.rows[0]);
 });
 
 app.post('/register', async (req, res) => {
@@ -69,22 +62,24 @@ app.post('/register', async (req, res) => {
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password required" });
   }
-   const existing = await pool.query("SELECT id FROM users WHERE email = $1", [
-     email,
-   ]);
-   if (existing.rows.length > 0) {
-     return res.status(409).json({ error: "User already exists" });
-   }
-   const passwordHash = await hashPassword(password);
 
-    const result = await pool.query(
-      "INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING *",
-      [email, passwordHash, "user"],
-    );
+  const existing = await pool.query("SELECT id FROM users WHERE email = $1", [
+    email,
+  ]);
+  if (existing.rows.length > 0) {
+    return res.status(409).json({ error: "User already exists" });
+  }
 
-    const user = result.rows[0];
+  const passwordHash = await hashPassword(password);
 
-    res.status(201).json({ id: user.id, email: user.email });
+  const result = await pool.query(
+    "INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING *",
+    [email, passwordHash, "user"],
+  );
+
+  const user = result.rows[0];
+
+  res.status(201).json({ id: user.id, email: user.email });
 });
 
 app.post('/login', async (req, res) => {
@@ -99,7 +94,6 @@ app.post('/login', async (req, res) => {
 
   const user = checkUser.rows[0];
 
-  // stays the same \/
   const valid = await verifyPassword(password, user.password_hash);
   if (!valid) {
     return res.status(401).json({ error: "Invalid credentials" });
@@ -113,7 +107,6 @@ app.post('/login', async (req, res) => {
 });
 
 app.get("/me", requireAuth, async (req, res) => {
-  // const user = users.find(u => u.id === req.user.id);
   const checkUser = await pool.query("SELECT * FROM users WHERE id = $1", [
     req.user.id,
   ]);
@@ -127,51 +120,66 @@ app.get("/me", requireAuth, async (req, res) => {
   res.json({ id: user.id, email: user.email, role: user.role });
 });
 
-app.get("/applications", requireAuth, (req, res) => {
-  const mine = applications.filter((a) => a.userId === req.user.id);
-  res.json(mine);
+app.get("/applications", requireAuth, async (req, res) => {
+  const result = await pool.query(
+    "SELECT * FROM applications WHERE user_id = $1",
+    [req.user.id],
+  );
+  res.json(result.rows);
 });
 
-app.get("/applications/:id", requireAuth, (req, res) => {
+app.get("/applications/:id", requireAuth, async (req, res) => {
   const id = Number(req.params.id);
-  const application = applications.find((a) => a.id === id);
-  if (!application || application.userId !== req.user.id) {
+  const result = await pool.query(
+    "SELECT * FROM applications WHERE id = $1 AND user_id = $2",
+    [id, req.user.id],
+  );
+  const application = result.rows[0];
+  if (!application) {
     return res.status(404).json({ error: "Application not found" });
   }
+
   res.json(application);
 });
 
-app.put("/applications/:id", requireAuth, (req, res) => {
+app.put("/applications/:id", requireAuth, async (req, res) => {
   const id = Number(req.params.id);
-  const application = applications.find((a) => a.id === id);
-  if (!application || application.userId !== req.user.id) {
-    return res.status(404).json({ error: "Application not found" });
-  }
   const { name, description } = req.body;
+
   if (!name || !description) {
     return res.status(400).json({ error: "Name and description required" });
   }
-  application.name = name;
-  application.description = description;
-  res.json(application);
-});
 
-app.delete("/applications/:id", requireAuth, (req, res) => {
-  const id = Number(req.params.id);
-  const index = applications.findIndex(
-    (a) => a.id === id && a.userId === req.user.id,
+  const result = await pool.query(
+    "UPDATE applications SET name = $1, description = $2 WHERE id = $3 AND user_id = $4 RETURNING *",
+    [name, description, id, req.user.id],
   );
 
-  if (index === -1) {
+  if (result.rows.length === 0) {
     return res.status(404).json({ error: "Application not found" });
   }
 
-  applications.splice(index, 1);
+  res.json(result.rows[0]);
+});
+
+app.delete("/applications/:id", requireAuth, async (req, res) => {
+  const id = Number(req.params.id);
+
+  const result = await pool.query(
+    "DELETE FROM applications WHERE id = $1 AND user_id = $2 RETURNING *",
+    [id, req.user.id],
+  );
+
+  if (result.rowCount === 0) {
+    return res.status(404).json({ error: "Application not found" });
+  }
+
   res.status(204).end();
 });
 
-app.get('/admin/users', requireAuth, requireRole('admin'), (req, res) => {
-  res.json(users.map(u => ({ id: u.id, email: u.email, role: u.role })));
+app.get("/admin/users", requireAuth, requireRole("admin"), async (req, res) => {
+  const result = await pool.query("SELECT id, email, role FROM users");
+  res.json(result.rows);
 });
 
 app.get('/health', (req, res) => {
@@ -181,7 +189,6 @@ app.get('/health', (req, res) => {
 app.get('/boom', (req, res) => {
   throw new Error('kaboom');
 });
-
 
 app.use((err, req, res, next) => {
   console.error(err);
