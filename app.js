@@ -1,6 +1,7 @@
 import express from 'express';
 import { hashPassword, verifyPassword } from './auth.js';
 import jwt from 'jsonwebtoken';
+import { pool } from "./db.js";
 
 const JWT_SECRET = 'dev-secret-change-me'; // this needs to be stored in an env variable
 
@@ -66,31 +67,42 @@ app.post('/register', async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password required' });
+    return res.status(400).json({ error: "Email and password required" });
   }
+   const existing = await pool.query("SELECT id FROM users WHERE email = $1", [
+     email,
+   ]);
+   if (existing.rows.length > 0) {
+     return res.status(409).json({ error: "User already exists" });
+   }
+   const passwordHash = await hashPassword(password);
 
-  if (users.find(u => u.email === email)) {
-    return res.status(409).json({ error: 'Email already registered' });
-  }
+    const result = await pool.query(
+      "INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING *",
+      [email, passwordHash, "user"],
+    );
 
-  const passwordHash = await hashPassword(password);
-  const user = { id: nextUserId++, email, passwordHash, role: "user" };
-  users.push(user);
+    const user = result.rows[0];
 
-  res.status(201).json({ id: user.id, email: user.email });
+    res.status(201).json({ id: user.id, email: user.email });
 });
 
 app.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
-  const user = users.find(u => u.email === email);
-  if (!user) {
-    return res.status(401).json({ error: 'Invalid credentials' });
+  const checkUser = await pool.query("SELECT * FROM users WHERE email = $1", [
+    email,
+  ]);
+  if (checkUser.rows.length === 0) {
+    return res.status(401).json({ error: "Invalid credentials" });
   }
 
-  const valid = await verifyPassword(password, user.passwordHash);
+  const user = checkUser.rows[0];
+
+  // stays the same \/
+  const valid = await verifyPassword(password, user.password_hash);
   if (!valid) {
-    return res.status(401).json({ error: 'Invalid credentials' });
+    return res.status(401).json({ error: "Invalid credentials" });
   }
 
   const token = jwt.sign({ sub: user.id, role: user.role }, JWT_SECRET, {
@@ -100,8 +112,18 @@ app.post('/login', async (req, res) => {
   res.json({ token });
 });
 
-app.get('/me', requireAuth, (req, res) => {
-  const user = users.find(u => u.id === req.user.id);
+app.get("/me", requireAuth, async (req, res) => {
+  // const user = users.find(u => u.id === req.user.id);
+  const checkUser = await pool.query("SELECT * FROM users WHERE id = $1", [
+    req.user.id,
+  ]);
+
+  const user = checkUser.rows[0];
+
+  if (!user) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
   res.json({ id: user.id, email: user.email, role: user.role });
 });
 
