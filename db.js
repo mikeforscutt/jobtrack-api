@@ -1,7 +1,11 @@
-import pg from 'pg';
+import "dotenv/config";
+import pg from "pg";
 
 const { Pool } = pg;
 
-export const pool = new Pool({
-  connectionString: 'postgres://mikeforscutt@localhost:5432/jobtrack',
-});
+const connectionString =
+  process.env.NODE_ENV === "test"
+    ? process.env.TEST_DATABASE_URL
+    : process.env.DATABASE_URL;
+
+export const pool = new Pool({ connectionString });

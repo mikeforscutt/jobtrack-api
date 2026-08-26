@@ -3,7 +3,7 @@ import { hashPassword, verifyPassword } from './auth.js';
 import jwt from 'jsonwebtoken';
 import { pool } from "./db.js";
 
-const JWT_SECRET = 'dev-secret-change-me'; // this needs to be stored in an env variable
+const JWT_SECRET = process.env.JWT_SECRET;
 
 const app = express();
 
@@ -195,4 +195,4 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Something went wrong' });
 })
 
-app.listen(3000, () => console.log("Listening on http://localhost:3000"));
+export default app;
