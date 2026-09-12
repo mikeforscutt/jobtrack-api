@@ -1,6 +1,7 @@
 import express from 'express';
 import { hashPassword, verifyPassword } from './auth.js';
 import jwt from 'jsonwebtoken';
+import pinoHttp from "pino-http";
 import {
   findByEmail,
   findById,
@@ -48,10 +49,9 @@ function requireRole(role) {
   };
 }
 
-app.use((req, res, next) => {
-  console.log('Request came in for', req.url);
-  next();
-});
+const logger = pinoHttp();
+
+app.use(logger);
 
 app.use(express.json());
 
