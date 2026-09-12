@@ -1,11 +1,25 @@
 import express from 'express';
 import { hashPassword, verifyPassword } from './auth.js';
 import jwt from 'jsonwebtoken';
-import { pool } from "./db.js";
+import {
+  findByEmail,
+  findById,
+  create,
+  findAll,
+} from "./repositories/userRepository.js";
+
+import {
+  insertApplication,
+  getApplicationsByUser,
+  getApplicationByIdAndUser,
+  updateApplication,
+  deleteApplication,
+} from "./repositories/applicationRepository.js";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
 const app = express();
+
 
 function requireAuth(req, res, next) {
   const header = req.headers.authorization;
@@ -47,13 +61,10 @@ app.post("/applications", requireAuth, async (req, res) => {
   if (!name || !description) {
     return res.status(400).json({ error: "Name and description required" });
   }
+  const application = { user_id: req.user.id, name, description };
+  const newApplication = await insertApplication(application);
 
-  const result = await pool.query(
-    "INSERT INTO applications (name, description, user_id) VALUES ($1, $2, $3) RETURNING *",
-    [name, description, req.user.id],
-  );
-
-  res.status(201).json(result.rows[0]);
+  res.status(201).json(newApplication);
 });
 
 app.post('/register', async (req, res) => {
@@ -63,21 +74,14 @@ app.post('/register', async (req, res) => {
     return res.status(400).json({ error: "Email and password required" });
   }
 
-  const existing = await pool.query("SELECT id FROM users WHERE email = $1", [
-    email,
-  ]);
-  if (existing.rows.length > 0) {
+  const existing = await findByEmail(email);
+  if (existing) {
     return res.status(409).json({ error: "User already exists" });
   }
 
   const passwordHash = await hashPassword(password);
 
-  const result = await pool.query(
-    "INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING *",
-    [email, passwordHash, "user"],
-  );
-
-  const user = result.rows[0];
+const user = await create(email, passwordHash);
 
   res.status(201).json({ id: user.id, email: user.email });
 });
@@ -85,14 +89,13 @@ app.post('/register', async (req, res) => {
 app.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
-  const checkUser = await pool.query("SELECT * FROM users WHERE email = $1", [
-    email,
-  ]);
-  if (checkUser.rows.length === 0) {
+  const checkUser = await findByEmail(email);
+
+  if (!checkUser) {
     return res.status(401).json({ error: "Invalid credentials" });
   }
 
-  const user = checkUser.rows[0];
+  const user = checkUser;
 
   const valid = await verifyPassword(password, user.password_hash);
   if (!valid) {
@@ -107,11 +110,7 @@ app.post('/login', async (req, res) => {
 });
 
 app.get("/me", requireAuth, async (req, res) => {
-  const checkUser = await pool.query("SELECT * FROM users WHERE id = $1", [
-    req.user.id,
-  ]);
-
-  const user = checkUser.rows[0];
+  const user = await findById(req.user.id);
 
   if (!user) {
     return res.status(404).json({ error: "User not found" });
@@ -121,20 +120,14 @@ app.get("/me", requireAuth, async (req, res) => {
 });
 
 app.get("/applications", requireAuth, async (req, res) => {
-  const result = await pool.query(
-    "SELECT * FROM applications WHERE user_id = $1",
-    [req.user.id],
-  );
-  res.json(result.rows);
+  const applications = await getApplicationsByUser(req.user.id);
+  res.json(applications);
 });
 
 app.get("/applications/:id", requireAuth, async (req, res) => {
   const id = Number(req.params.id);
-  const result = await pool.query(
-    "SELECT * FROM applications WHERE id = $1 AND user_id = $2",
-    [id, req.user.id],
-  );
-  const application = result.rows[0];
+
+  const application = await getApplicationByIdAndUser(id, req.user.id);
   if (!application) {
     return res.status(404).json({ error: "Application not found" });
   }
@@ -143,43 +136,32 @@ app.get("/applications/:id", requireAuth, async (req, res) => {
 });
 
 app.put("/applications/:id", requireAuth, async (req, res) => {
-  const id = Number(req.params.id);
+  const id = req.params.id;
   const { name, description } = req.body;
-
-  if (!name || !description) {
-    return res.status(400).json({ error: "Name and description required" });
-  }
-
-  const result = await pool.query(
-    "UPDATE applications SET name = $1, description = $2 WHERE id = $3 AND user_id = $4 RETURNING *",
-    [name, description, id, req.user.id],
+  const application = { name, description };
+  const updatedApplication = await updateApplication(
+    id,
+    req.user.id,
+    application,
   );
-
-  if (result.rows.length === 0) {
+  if (!updatedApplication) {
     return res.status(404).json({ error: "Application not found" });
   }
-
-  res.json(result.rows[0]);
+  res.json(updatedApplication);
 });
 
 app.delete("/applications/:id", requireAuth, async (req, res) => {
-  const id = Number(req.params.id);
-
-  const result = await pool.query(
-    "DELETE FROM applications WHERE id = $1 AND user_id = $2 RETURNING *",
-    [id, req.user.id],
-  );
-
-  if (result.rowCount === 0) {
+  const id = req.params.id;
+  const success = await deleteApplication(id, req.user.id);
+  if (!success) {
     return res.status(404).json({ error: "Application not found" });
   }
-
-  res.status(204).end();
+  res.sendStatus(204);
 });
 
 app.get("/admin/users", requireAuth, requireRole("admin"), async (req, res) => {
-  const result = await pool.query("SELECT id, email, role FROM users");
-  res.json(result.rows);
+  const users = await findAll();
+  res.json(users);
 });
 
 app.get('/health', (req, res) => {
