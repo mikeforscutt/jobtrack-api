@@ -2,6 +2,7 @@ import express from 'express';
 import { hashPassword, verifyPassword } from './auth.js';
 import jwt from 'jsonwebtoken';
 import pinoHttp from "pino-http";
+import client from "prom-client";
 import {
   findByEmail,
   findById,
@@ -21,6 +22,20 @@ const JWT_SECRET = process.env.JWT_SECRET;
 
 const app = express();
 
+client.collectDefaultMetrics();
+
+const httpRequestCounter = new client.Counter({
+  name: "http_requests_total",
+  help: "Total number of HTTP requests",
+  labelNames: ["method", "route", "status_code"],
+});
+
+const httpRequestDuration = new client.Histogram({
+  name: "http_request_duration_seconds",
+  help: "Duration of HTTP requests in seconds",
+  labelNames: ["method", "route", "status_code"],
+  buckets: [0.01, 0.05, 0.1, 0.5, 1, 2, 5],
+});
 
 function requireAuth(req, res, next) {
   const header = req.headers.authorization;
@@ -51,9 +66,29 @@ function requireRole(role) {
 
 const logger = pinoHttp();
 
+app.use(express.json());
 app.use(logger);
 
-app.use(express.json());
+app.use((req, res, next) => {
+  const start = Date.now();
+
+  res.on("finish", () => {
+    const duration = (Date.now() - start) / 1000;
+    const route = req.route ? req.route.path : req.path;
+
+    httpRequestCounter.inc({
+      method: req.method,
+      route,
+      status_code: res.statusCode,
+    });
+    httpRequestDuration.observe(
+      { method: req.method, route, status_code: res.statusCode },
+      duration,
+    );
+  });
+
+  next();
+});
 
 app.post("/applications", requireAuth, async (req, res) => {
   const { name, description } = req.body;
@@ -81,7 +116,7 @@ app.post('/register', async (req, res) => {
 
   const passwordHash = await hashPassword(password);
 
-const user = await create(email, passwordHash);
+  const user = await create(email, passwordHash);
 
   res.status(201).json({ id: user.id, email: user.email });
 });
@@ -107,6 +142,11 @@ app.post('/login', async (req, res) => {
   });
 
   res.json({ token });
+});
+
+app.get("/metrics", async (req, res) => {
+  res.set("Content-Type", client.register.contentType);
+  res.end(await client.register.metrics());
 });
 
 app.get("/me", requireAuth, async (req, res) => {
