@@ -124,3 +124,56 @@ describe("PUT /applications/:id", () => {
     expect(updateResponse.status).toBe(404);
   });
 });
+
+describe("DELETE /applications/:id", () => {
+  it("deletes the application as userA and returns 204", async () => {
+    // Create an application as userA
+    const application = {
+      name: "My Application",
+      description: "This is my application",
+    };
+
+    const createResponse = await request(app)
+      .post("/applications")
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send(application);
+
+    const applicationId = createResponse.body.id;
+
+    // Delete the application as userA
+    const deleteResponse = await request(app)
+      .delete(`/applications/${applicationId}`)
+      .set("Authorization", `Bearer ${tokenA}`);
+
+    expect(deleteResponse.status).toBe(204);
+
+    // Confirm the record is actually gone
+    const fetchResponse = await request(app)
+      .get(`/applications/${applicationId}`)
+      .set("Authorization", `Bearer ${tokenA}`);
+
+    expect(fetchResponse.status).toBe(404);
+  });
+
+  it("returns 404 when attempting to delete the application as userB", async () => {
+    // Create an application as userA
+    const application = {
+      name: "My Application",
+      description: "This is my application",
+    };
+
+    const createResponse = await request(app)
+      .post("/applications")
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send(application);
+
+    const applicationId = createResponse.body.id;
+
+    // Attempt to delete the application as userB
+    const deleteResponse = await request(app)
+      .delete(`/applications/${applicationId}`)
+      .set("Authorization", `Bearer ${tokenB}`);
+
+    expect(deleteResponse.status).toBe(404);
+  });
+});
