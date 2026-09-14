@@ -26,8 +26,14 @@ export async function getApplicationByIdAndUser(id, user_id) {
 
 export async function updateApplication(id, user_id, application) {
   const result = await pool.query(
-    "UPDATE applications SET name = $1, description = $2 WHERE id = $3 AND user_id = $4 RETURNING *",
-    [application.name, application.description, id, user_id]
+    "UPDATE applications SET name = $1, description = $2, status = COALESCE($3, status) WHERE id = $4 AND user_id = $5 RETURNING *",
+    [
+      application.name,
+      application.description,
+      application.status,
+      id,
+      user_id,
+    ],
   );
   return result.rows[0];
 }
