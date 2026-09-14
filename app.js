@@ -2,6 +2,7 @@ import express from 'express';
 import { hashPassword, verifyPassword } from './auth.js';
 import jwt from 'jsonwebtoken';
 import pinoHttp from "pino-http";
+import cors from "cors";
 import client from "prom-client";
 import {
   findByEmail,
@@ -63,7 +64,7 @@ function requireRole(role) {
     next();
   };
 }
-
+app.use(cors());
 const logger = pinoHttp();
 
 app.use(express.json());
