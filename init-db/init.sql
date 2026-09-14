@@ -9,5 +9,6 @@ CREATE TABLE applications (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
   description TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'applied',
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE
 );

@@ -178,8 +178,8 @@ app.get("/applications/:id", requireAuth, async (req, res) => {
 
 app.put("/applications/:id", requireAuth, async (req, res) => {
   const id = req.params.id;
-  const { name, description } = req.body;
-  const application = { name, description };
+  const { name, description, status } = req.body;
+  const application = { name, description, status };
   const updatedApplication = await updateApplication(
     id,
     req.user.id,
