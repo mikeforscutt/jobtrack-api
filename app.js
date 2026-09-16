@@ -9,6 +9,7 @@ import {
   findById,
   create,
   findAll,
+  getTotalUsers,
 } from "./repositories/userRepository.js";
 
 import {
@@ -17,6 +18,8 @@ import {
   getApplicationByIdAndUser,
   updateApplication,
   deleteApplication,
+  getTotalApplications,
+  countByStatus,
 } from "./repositories/applicationRepository.js";
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -174,6 +177,21 @@ app.get("/applications/:id", requireAuth, async (req, res) => {
   }
 
   res.json(application);
+});
+
+app.get("/admin/stats", requireAuth, requireRole("admin"), async (req, res) => {
+  const totalUsers = await getTotalUsers();
+  const totalApplications = await getTotalApplications();
+  const statusCounts = await countByStatus();
+
+  res.json({
+    totalUsers,
+    totalApplications,
+    statusCounts: statusCounts.map((row) => ({
+      status: row.status,
+      count: Number(row.count),
+    })),
+  });
 });
 
 app.put("/applications/:id", requireAuth, async (req, res) => {

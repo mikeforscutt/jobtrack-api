@@ -1,9 +1,9 @@
-import { pool } from '../db.js';
+import { pool } from "../db.js";
 
 export async function insertApplication(application) {
   const result = await pool.query(
     "INSERT INTO applications (user_id, name, description) VALUES ($1, $2, $3) RETURNING *",
-    [application.user_id, application.name, application.description]
+    [application.user_id, application.name, application.description],
   );
   return result.rows[0];
 }
@@ -11,7 +11,7 @@ export async function insertApplication(application) {
 export async function getApplicationsByUser(user_id) {
   const result = await pool.query(
     "SELECT * FROM applications WHERE user_id = $1",
-    [user_id]
+    [user_id],
   );
   return result.rows;
 }
@@ -19,7 +19,7 @@ export async function getApplicationsByUser(user_id) {
 export async function getApplicationByIdAndUser(id, user_id) {
   const result = await pool.query(
     "SELECT * FROM applications WHERE id = $1 AND user_id = $2",
-    [id, user_id]
+    [id, user_id],
   );
   return result.rows[0];
 }
@@ -41,7 +41,19 @@ export async function updateApplication(id, user_id, application) {
 export async function deleteApplication(id, user_id) {
   const result = await pool.query(
     "DELETE FROM applications WHERE id = $1 AND user_id = $2",
-    [id, user_id]
+    [id, user_id],
   );
   return result.rowCount > 0;
+}
+
+export async function countByStatus() {
+  const result = await pool.query(
+    "SELECT status, COUNT(*) FROM applications GROUP BY status",
+  );
+  return result.rows;
+}
+
+export async function getTotalApplications() {
+  const result = await pool.query("SELECT COUNT(*) FROM applications");
+  return Number(result.rows[0].count);
 }
