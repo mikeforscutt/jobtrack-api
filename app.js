@@ -95,13 +95,17 @@ app.use((req, res, next) => {
 });
 
 app.post("/applications", requireAuth, async (req, res) => {
-  const { name, description } = req.body;
+  const { job_id } = req.body;
 
-  if (!name || !description) {
-    return res.status(400).json({ error: "Name and description required" });
+  if (!job_id) {
+    return res.status(400).json({ error: "job_id is required" });
   }
-  const application = { user_id: req.user.id, name, description };
-  const newApplication = await insertApplication(application);
+
+  const newApplication = await insertApplication(job_id, req.user.id);
+
+  if (!newApplication) {
+    return res.status(400).json({ error: "Invalid job_id" });
+  }
 
   res.status(201).json(newApplication);
 });

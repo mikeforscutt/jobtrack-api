@@ -1,11 +1,18 @@
 import { pool } from "../db.js";
 
-export async function insertApplication(application) {
-  const result = await pool.query(
-    "INSERT INTO applications (user_id, name, description) VALUES ($1, $2, $3) RETURNING *",
-    [application.user_id, application.name, application.description],
-  );
-  return result.rows[0];
+export async function insertApplication(job_id, user_id) {
+  try {
+    const result = await pool.query(
+      "INSERT INTO applications (job_id, user_id) VALUES ($1, $2) RETURNING *",
+      [job_id, user_id],
+    );
+    return result.rows[0];
+  } catch (err) {
+    if (err.code === "23503") {
+      return null;
+    }
+    throw err;
+  }
 }
 
 export async function getApplicationsByUser(user_id) {
