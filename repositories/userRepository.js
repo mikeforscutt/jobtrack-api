@@ -23,3 +23,7 @@ export async function create(email, passwordHash) {
   return result.rows[0];
 }
 
+export async function getTotalUsers() {
+  const result = await pool.query("SELECT COUNT(*) FROM users");
+  return Number(result.rows[0].count);
+}
