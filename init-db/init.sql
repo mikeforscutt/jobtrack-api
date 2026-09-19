@@ -18,5 +18,6 @@ CREATE TABLE applications (
   id SERIAL PRIMARY KEY,
   job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  status TEXT NOT NULL DEFAULT 'applied'
+  status TEXT NOT NULL DEFAULT 'applied',
+  UNIQUE (user_id, job_id)
 );

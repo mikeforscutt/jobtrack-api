@@ -105,6 +105,12 @@ app.post("/applications", requireAuth, async (req, res) => {
 
   const newApplication = await insertApplication(job_id, req.user.id);
 
+  if (newApplication === "duplicate") {
+    return res
+      .status(409)
+      .json({ error: "You have already applied to this job" });
+  }
+
   if (!newApplication) {
     return res.status(400).json({ error: "Invalid job_id" });
   }

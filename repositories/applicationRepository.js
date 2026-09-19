@@ -11,6 +11,9 @@ export async function insertApplication(job_id, user_id) {
     if (err.code === "23503") {
       return null;
     }
+    if (err.code === "23505") {
+      return "duplicate";
+    }
     throw err;
   }
 }
