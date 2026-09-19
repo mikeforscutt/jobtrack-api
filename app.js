@@ -22,6 +22,8 @@ import {
   countByStatus,
 } from "./repositories/applicationRepository.js";
 
+import { getOpenJobs } from "./repositories/jobsRepository.js";
+
 const JWT_SECRET = process.env.JWT_SECRET;
 
 const app = express();
@@ -157,6 +159,11 @@ app.get("/metrics", async (req, res) => {
   res.end(await client.register.metrics());
 });
 
+app.get("/jobs", async (req, res) => {
+  const jobs = await getOpenJobs();
+  res.json(jobs);
+});
+
 app.get("/me", requireAuth, async (req, res) => {
   const user = await findById(req.user.id);
 
@@ -200,16 +207,16 @@ app.get("/admin/stats", requireAuth, requireRole("admin"), async (req, res) => {
 
 app.put("/applications/:id", requireAuth, async (req, res) => {
   const id = req.params.id;
-  const { name, description, status } = req.body;
-  const application = { name, description, status };
-  const updatedApplication = await updateApplication(
-    id,
-    req.user.id,
-    application,
-  );
+  const { status } = req.body;
+
+  const updatedApplication = await updateApplication(id, req.user.id, {
+    status,
+  });
+
   if (!updatedApplication) {
     return res.status(404).json({ error: "Application not found" });
   }
+
   res.json(updatedApplication);
 });
 
