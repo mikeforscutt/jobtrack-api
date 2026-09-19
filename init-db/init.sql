@@ -5,10 +5,18 @@ CREATE TABLE users (
   role TEXT NOT NULL DEFAULT 'user'
 );
 
+CREATE TABLE jobs (
+  id SERIAL PRIMARY KEY,
+  company_name TEXT NOT NULL,
+  job_title TEXT NOT NULL,
+  open BOOLEAN NOT NULL DEFAULT TRUE,
+  user_id INTEGER NULL,
+  CONSTRAINT fk_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
 CREATE TABLE applications (
   id SERIAL PRIMARY KEY,
-  name TEXT NOT NULL,
-  description TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'applied',
-  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE
+  job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'applied'
 );

@@ -1,16 +1,26 @@
 import { pool } from "../db.js";
 
-export async function insertApplication(application) {
-  const result = await pool.query(
-    "INSERT INTO applications (user_id, name, description) VALUES ($1, $2, $3) RETURNING *",
-    [application.user_id, application.name, application.description],
-  );
-  return result.rows[0];
+export async function insertApplication(job_id, user_id) {
+  try {
+    const result = await pool.query(
+      "INSERT INTO applications (job_id, user_id) VALUES ($1, $2) RETURNING *",
+      [job_id, user_id],
+    );
+    return result.rows[0];
+  } catch (err) {
+    if (err.code === "23503") {
+      return null;
+    }
+    throw err;
+  }
 }
 
 export async function getApplicationsByUser(user_id) {
   const result = await pool.query(
-    "SELECT * FROM applications WHERE user_id = $1",
+    `SELECT applications.id, applications.status, jobs.id AS job_id, jobs.company_name, jobs.job_title
+     FROM applications
+     JOIN jobs ON applications.job_id = jobs.id
+     WHERE applications.user_id = $1`,
     [user_id],
   );
   return result.rows;
@@ -18,22 +28,20 @@ export async function getApplicationsByUser(user_id) {
 
 export async function getApplicationByIdAndUser(id, user_id) {
   const result = await pool.query(
-    "SELECT * FROM applications WHERE id = $1 AND user_id = $2",
+    `SELECT applications.id, applications.status, jobs.id AS job_id, jobs.company_name, jobs.job_title
+     FROM applications
+     JOIN jobs ON applications.job_id = jobs.id
+     WHERE applications.id = $1 AND applications.user_id = $2`,
     [id, user_id],
   );
   return result.rows[0];
 }
 
-export async function updateApplication(id, user_id, application) {
+export async function updateApplication(id, user_id, updatedData) {
+  const { status } = updatedData;
   const result = await pool.query(
-    "UPDATE applications SET name = $1, description = $2, status = COALESCE($3, status) WHERE id = $4 AND user_id = $5 RETURNING *",
-    [
-      application.name,
-      application.description,
-      application.status,
-      id,
-      user_id,
-    ],
+    "UPDATE applications SET status = COALESCE($1, status) WHERE id = $2 AND user_id = $3 RETURNING *",
+    [status, id, user_id],
   );
   return result.rows[0];
 }
