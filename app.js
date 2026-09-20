@@ -153,9 +153,11 @@ app.post('/login', async (req, res) => {
     return res.status(401).json({ error: "Invalid credentials" });
   }
 
-  const token = jwt.sign({ sub: user.id, role: user.role }, JWT_SECRET, {
-    expiresIn: "15m",
-  });
+ const token = jwt.sign(
+   { sub: user.id, role: user.role, email: user.email },
+   JWT_SECRET,
+   { expiresIn: "15m" },
+ );
 
   res.json({ token });
 });
