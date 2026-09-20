@@ -166,8 +166,12 @@ app.get("/metrics", async (req, res) => {
 });
 
 app.get("/jobs", async (req, res) => {
-  const jobs = await getOpenJobs();
-  res.json(jobs);
+  const pageSize = Number(req.query.pageSize) || 10;
+  const pageNumber = Number(req.query.pageNumber) || 1;
+
+  const { jobs, totalJobs } = await getOpenJobs(pageSize, pageNumber);
+
+  res.json({ jobs, totalJobs, pageSize, pageNumber });
 });
 
 app.get("/me", requireAuth, async (req, res) => {
