@@ -168,8 +168,9 @@ app.get("/metrics", async (req, res) => {
 app.get("/jobs", async (req, res) => {
   const pageSize = Number(req.query.pageSize) || 10;
   const pageNumber = Number(req.query.pageNumber) || 1;
+  const search = req.query.search || "";
 
-  const { jobs, totalJobs } = await getOpenJobs(pageSize, pageNumber);
+  const { jobs, totalJobs } = await getOpenJobs(pageSize, pageNumber, search);
 
   res.json({ jobs, totalJobs, pageSize, pageNumber });
 });
