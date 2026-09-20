@@ -37,3 +37,19 @@ export async function getRecentJobs(limit = 5) {
   );
   return result.rows;
 }
+
+export async function getPopularJobs(limit = 5) {
+  const result = await pool.query(
+    `SELECT jobs.id, jobs.company_name, jobs.job_title, COUNT(applications.id) AS application_count
+     FROM jobs
+     JOIN applications ON applications.job_id = jobs.id
+     GROUP BY jobs.id
+     ORDER BY application_count DESC
+     LIMIT $1`,
+    [limit],
+  );
+  return result.rows.map((row) => ({
+    ...row,
+    application_count: Number(row.application_count),
+  }));
+}
