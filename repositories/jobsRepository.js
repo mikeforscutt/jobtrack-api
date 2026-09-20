@@ -1,18 +1,24 @@
 import { pool } from "../db.js";
 
-export async function getOpenJobs(pageSize, pageNumber) {
+export async function getOpenJobs(pageSize, pageNumber, search = "") {
   const offset = (pageNumber - 1) * pageSize;
+  const searchPattern = `%${search}%`;
+
   const result = await pool.query(
     `SELECT * FROM jobs
      WHERE open = true
+     AND (company_name ILIKE $1 OR job_title ILIKE $1)
      ORDER BY id
-     LIMIT $1 OFFSET $2`,
-    [pageSize, offset],
+     LIMIT $2 OFFSET $3`,
+    [searchPattern, pageSize, offset],
   );
 
-  // Count of all open jobs
-  const countQuery = "SELECT COUNT(*) FROM jobs WHERE open = true";
-  const countResult = await pool.query(countQuery);
+  const countResult = await pool.query(
+    `SELECT COUNT(*) FROM jobs
+     WHERE open = true
+     AND (company_name ILIKE $1 OR job_title ILIKE $1)`,
+    [searchPattern],
+  );
   const totalJobs = Number(countResult.rows[0].count);
 
   return {
