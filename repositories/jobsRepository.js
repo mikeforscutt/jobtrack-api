@@ -26,3 +26,14 @@ export async function getOpenJobs(pageSize, pageNumber, search = "") {
     totalJobs,
   };
 }
+
+export async function getRecentJobs(limit = 5) {
+  const result = await pool.query(
+    `SELECT * FROM jobs
+     WHERE open = true
+     ORDER BY id DESC
+     LIMIT $1`,
+    [limit],
+  );
+  return result.rows;
+}

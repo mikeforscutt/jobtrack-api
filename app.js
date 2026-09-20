@@ -22,7 +22,7 @@ import {
   countByStatus,
 } from "./repositories/applicationRepository.js";
 
-import { getOpenJobs } from "./repositories/jobsRepository.js";
+import { getOpenJobs, getRecentJobs } from "./repositories/jobsRepository.js";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -175,6 +175,11 @@ app.get("/jobs", async (req, res) => {
   const { jobs, totalJobs } = await getOpenJobs(pageSize, pageNumber, search);
 
   res.json({ jobs, totalJobs, pageSize, pageNumber });
+});
+
+app.get("/jobs/recent", async (req, res) => {
+  const jobs = await getRecentJobs(5);
+  res.json(jobs);
 });
 
 app.get("/me", requireAuth, async (req, res) => {
